@@ -43,6 +43,8 @@ For each captured value, scoping decides where it goes:
 
 The [template](https://github.com/mattpocock/skills/blob/main/skills/engineering/wizard/template.sh) ships the whole experience: progress with time remaining, confirmation gates, cross-platform URL opening including WSL, hidden entry for secrets, idempotent `.env` upserts, `gh secret` / `gh variable` writes, and a closing summary of everything it had to skip. Everything above the `STAGES` marker is a fixed library, identical in every wizard and never hand-edited. Because the library never changes, every wizard behaves the same way. The only work per wizard is to scope the procedure and author its stages.
 
+Captured variable names such as `input`, `key`, and `value` work just like uppercase names. Names starting with `_wizard_` are reserved for the template's internal variables. If the wizard cannot read an existing `.env`, it stops without overwriting that file; fix the file permissions before re-running.
+
 The agent that writes a wizard never runs it end to end, because the script opens browsers and waits for human input. The agent checks it statically instead: `bash -n`, `shellcheck` where available, and a trace that every value lands where scoping said it would, with every `set_secret` name matching a real `secrets.*` reference in CI. So the first run is yours, and that run is the test.
 
 ## Ephemeral by default
