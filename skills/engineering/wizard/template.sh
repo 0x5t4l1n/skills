@@ -107,47 +107,55 @@ _existing() {
 # a default on re-runs (Enter keeps it). Visible input (non-secret), edited
 # with Readline. Fails at EOF with no input.
 ask() {
-  local key="$1" prompt="$2" current input s=$'\001' e=$'\002' p rc=0
-  current=$(_existing "$key" || true)
+  local _wizard_key="$1" _wizard_prompt="$2" _wizard_current _wizard_input _wizard_s=$'\001' _wizard_e=$'\002' _wizard_p _wizard_rc=0
+  _wizard_current=$(_existing "$_wizard_key" || true)
   # Readline needs the colour codes wrapped in \001..\002 to place the cursor.
-  p="  $s$BOLD$e$prompt$s$RESET$e "
-  [[ -n "$current" ]] && p+="$s$DIM$e[Enter keeps current]$s$RESET$e "
-  read -e -r -p "$p" input || rc=1
-  if (( rc )) && [[ -z "$input" ]]; then return 1; fi
-  [[ -z "$input" && -n "$current" ]] && input="$current"
-  printf -v "$key" '%s' "$input"
+  _wizard_p="  $_wizard_s$BOLD$_wizard_e$_wizard_prompt$_wizard_s$RESET$_wizard_e "
+  [[ -n "$_wizard_current" ]] && _wizard_p+="$_wizard_s$DIM$_wizard_e[Enter keeps current]$_wizard_s$RESET$_wizard_e "
+  read -e -r -p "$_wizard_p" _wizard_input || _wizard_rc=1
+  if (( _wizard_rc )) && [[ -z "$_wizard_input" ]]; then return 1; fi
+  [[ -z "$_wizard_input" && -n "$_wizard_current" ]] && _wizard_input="$_wizard_current"
+  printf -v "$_wizard_key" '%s' "$_wizard_input"
 }
 
 # ask_secret KEY "Prompt" is like ask, but input is hidden.
 ask_secret() {
-  local key="$1" prompt="$2" current input rc=0
-  current=$(_existing "$key" || true)
-  if [[ -n "$current" ]]; then
-    printf '  %s%s%s %s[Enter keeps current]%s ' "$BOLD" "$prompt" "$RESET" "$DIM" "$RESET"
+  local _wizard_key="$1" _wizard_prompt="$2" _wizard_current _wizard_input _wizard_rc=0
+  _wizard_current=$(_existing "$_wizard_key" || true)
+  if [[ -n "$_wizard_current" ]]; then
+    printf '  %s%s%s %s[Enter keeps current]%s ' "$BOLD" "$_wizard_prompt" "$RESET" "$DIM" "$RESET"
   else
-    printf '  %s%s%s ' "$BOLD" "$prompt" "$RESET"
+    printf '  %s%s%s ' "$BOLD" "$_wizard_prompt" "$RESET"
   fi
-  read -rs input || rc=1
+  read -rs _wizard_input || _wizard_rc=1
   printf '\n'
-  if (( rc )) && [[ -z "$input" ]]; then return 1; fi
-  [[ -z "$input" && -n "$current" ]] && input="$current"
-  printf -v "$key" '%s' "$input"
+  if (( _wizard_rc )) && [[ -z "$_wizard_input" ]]; then return 1; fi
+  [[ -z "$_wizard_input" && -n "$_wizard_current" ]] && _wizard_input="$_wizard_current"
+  printf -v "$_wizard_key" '%s' "$_wizard_input"
 }
 
 # write_env KEY VALUE upserts KEY='VALUE' into ENV_FILE (replaces any existing
 # line) and sets $KEY. Idempotent. Creates ENV_FILE at mode 0600; writes through
 # a symlink and keeps an existing file's mode.
 write_env() {
-  local key="$1" value="$2" tmp sq="'\\''"
+  local _wizard_key="$1" _wizard_value="$2" _wizard_tmp _wizard_sq="'\\''"
   [[ -e "$ENV_FILE" ]] || (umask 077 && : > "$ENV_FILE")
-  tmp=$(mktemp)
-  grep -vE "^${key}=" "$ENV_FILE" > "$tmp" || true
-  printf "%s='%s'\n" "$key" "${value//\'/$sq}" >> "$tmp"
-  cat "$tmp" > "$ENV_FILE"
-  rm -f "$tmp"
-  printf -v "$key" '%s' "$value"
-  WRITTEN_ENV+=("$key")
-  printf '  %s✓ wrote%s %s → %s\n' "$GREEN" "$RESET" "$key" "$ENV_FILE"
+  _wizard_tmp=$(mktemp)
+  # grep returns 1 when no lines remain; other failures must not overwrite .env.
+  if grep -vE "^${_wizard_key}=" "$ENV_FILE" > "$_wizard_tmp"; then
+    :
+  else
+    case $? in
+      1) ;; # An empty file, or every line matched the key being replaced.
+      *) rm -f "$_wizard_tmp"; return 1 ;;
+    esac
+  fi
+  printf "%s='%s'\n" "$_wizard_key" "${_wizard_value//\'/$_wizard_sq}" >> "$_wizard_tmp"
+  cat "$_wizard_tmp" > "$ENV_FILE"
+  rm -f "$_wizard_tmp"
+  printf -v "$_wizard_key" '%s' "$_wizard_value"
+  WRITTEN_ENV+=("$_wizard_key")
+  printf '  %s✓ wrote%s %s → %s\n' "$GREEN" "$RESET" "$_wizard_key" "$ENV_FILE"
 }
 
 # set_secret NAME VALUE sets a GitHub Actions repo secret via gh. Falls back
